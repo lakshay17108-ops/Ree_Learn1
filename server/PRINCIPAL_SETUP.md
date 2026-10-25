@@ -4,6 +4,8 @@ Teacher accounts created through registration remain pending until a principal a
 
 After installing server dependencies and syncing the Prisma schema, create the first principal from PowerShell:
 
+For PostgreSQL setup or migration from the previous SQLite database, see [DATABASE_MIGRATION.md](./DATABASE_MIGRATION.md).
+
 ```powershell
 Push-Location server
 $env:PRINCIPAL_EMAIL = "principal@your-school.edu"

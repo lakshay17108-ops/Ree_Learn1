@@ -6,3 +6,4 @@ server/prisma/*.db
 server/prisma/*.db-*
 dist/
 build/
+.vercel/

@@ -12,7 +12,7 @@ import { Button, EmptyState, Modal, Spinner } from '../components/ui';
 const inputClass = 'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-teal-700 focus:ring-2 focus:ring-teal-700/15';
 const actionClass = 'inline-flex items-center gap-1.5 rounded-md px-2.5 py-2 text-xs font-medium transition-colors';
 
-const errorMessage = (error) => error?.response?.data?.error || 'Something went wrong. Please try again.';
+const errorMessage = (error) => error?.response?.data?.error || error?.message || 'Something went wrong. Please try again.';
 
 const RevisionMedia = ({ post }) => {
   const [source, setSource] = useState('');
@@ -77,12 +77,43 @@ export const RevisionFeed = () => {
 
   const publishMutation = useMutation({
     mutationFn: async () => {
-      const body = new FormData();
-      body.append('subjectId', draft.subjectId);
-      body.append('title', draft.title);
-      body.append('content', draft.content);
-      if (media) body.append('media', media);
-      return api.post('/revision/posts', body);
+      let uploadedMedia = {};
+      if (media) {
+        if (!/^(image|video)\//.test(media.type)) {
+          throw new Error('Choose an image or video file.');
+        }
+        if (media.size > 75 * 1024 * 1024) {
+          throw new Error('Media must be 75 MB or smaller.');
+        }
+        const { data: upload } = await api.post('/revision/upload-signature', { subjectId: draft.subjectId });
+        const body = new FormData();
+        body.append('file', media);
+        body.append('api_key', upload.apiKey);
+        body.append('timestamp', upload.timestamp);
+        body.append('public_id', upload.publicId);
+        body.append('signature', upload.signature);
+
+        const response = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(upload.cloudName)}/auto/upload`, {
+          method: 'POST',
+          body
+        });
+        let result;
+        try {
+          result = await response.json();
+        } catch (error) {
+          throw new Error('Cloudinary returned an invalid upload response.');
+        }
+        const uploadedType = result.resource_type === 'image' ? 'IMAGE' : result.resource_type === 'video' ? 'VIDEO' : null;
+        if (!response.ok || !result.secure_url || result.public_id !== upload.publicId
+          || uploadedType !== (media.type.startsWith('image/') ? 'IMAGE' : 'VIDEO')) {
+          throw new Error(result.error?.message || 'Could not upload media to Cloudinary.');
+        }
+        uploadedMedia = {
+          mediaUrl: result.secure_url,
+          mediaType: uploadedType
+        };
+      }
+      return api.post('/revision/posts', { ...draft, ...uploadedMedia });
     },
     onSuccess: () => {
       refreshPosts();
@@ -249,7 +280,17 @@ export const RevisionFeed = () => {
               {media?.type.startsWith('video/') ? <Video className="h-5 w-5 text-teal-800" /> : <Image className="h-5 w-5 text-teal-800" />}
               <span className="min-w-0 flex-1 truncate">{media ? media.name : 'Choose an image or video'}</span>
               <Upload className="h-4 w-4 shrink-0 text-slate-400" />
-              <input className="sr-only" type="file" accept="image/*,video/*" onChange={event => setMedia(event.target.files?.[0] || null)} />
+              <input className="sr-only" type="file" accept="image/*,video/*" onChange={event => {
+                const selectedMedia = event.target.files?.[0] || null;
+                if (selectedMedia?.size > 75 * 1024 * 1024) {
+                  setMedia(null);
+                  setFormError('Media must be 75 MB or smaller.');
+                  event.target.value = '';
+                  return;
+                }
+                setFormError('');
+                setMedia(selectedMedia);
+              }} />
             </span>
           </label>
           {media && <button onClick={() => setMedia(null)} className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-red-700"><X className="h-3.5 w-3.5" /> Remove media</button>}

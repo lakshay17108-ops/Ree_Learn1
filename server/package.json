@@ -6,7 +6,10 @@
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "seed": "node prisma/seed.js",
-    "principal:create": "node prisma/create-principal.js"
+    "principal:create": "node prisma/create-principal.js",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate:sqlite": "prisma generate --schema prisma/sqlite-source.prisma && node prisma/migrate-sqlite-to-postgres.js"
   },
   "dependencies": {
     "@prisma/client": "^5.15.0",

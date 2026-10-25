@@ -1,0 +1,179 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/sqlite-client"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id             String   @id
+  name           String
+  email          String
+  passwordHash   String
+  role           String
+  approvalStatus String
+  approvedAt     DateTime?
+  approvedById   String?
+  avatarUrl      String?
+  createdAt      DateTime
+
+  @@map("users")
+}
+
+model Classroom {
+  id        String   @id
+  name      String
+  section   String
+  joinCode  String
+  teacherId String
+  createdAt DateTime
+
+  @@map("classrooms")
+}
+
+model ClassEnrollment {
+  id          String   @id
+  classroomId String
+  studentId   String
+  enrolledAt  DateTime
+
+  @@map("class_enrollments")
+}
+
+model Subject {
+  id          String @id
+  classroomId String
+  name        String
+  code        String
+
+  @@map("subjects")
+}
+
+model Question {
+  id            String @id
+  subjectId     String
+  topic         String
+  questionText  String
+  options       String
+  correctOption String
+  explanation   String
+  difficulty    String
+
+  @@map("questions")
+}
+
+model Quiz {
+  id               String @id
+  subjectId        String
+  title            String
+  description      String?
+  timeLimitMinutes Int
+  totalMarks       Int
+  createdById      String
+
+  @@map("quizzes")
+}
+
+model QuizQuestion {
+  quizId     String
+  questionId String
+  marks      Int
+
+  @@id([quizId, questionId])
+  @@map("quiz_questions")
+}
+
+model Assignment {
+  id                  String   @id
+  quizId              String
+  classroomId         String
+  assignedToStudentId String?
+  dueDate             DateTime
+  createdAt           DateTime
+
+  @@map("assignments")
+}
+
+model QuizAttempt {
+  id               String   @id
+  quizId           String
+  assignmentId     String?
+  studentId        String
+  score            Float
+  totalScore       Float
+  timeSpentSeconds Int?
+  submittedAt      DateTime
+
+  @@map("quiz_attempts")
+}
+
+model StudentQuestionAnswer {
+  id             String  @id
+  attemptId      String
+  studentId      String
+  questionId     String
+  selectedOption String
+  isCorrect      Boolean
+
+  @@map("student_question_answers")
+}
+
+model RevisionPost {
+  id          String   @id
+  subjectId   String
+  createdById String
+  title       String
+  content     String
+  mediaUrl    String?
+  mediaType   String?
+  createdAt   DateTime
+
+  @@map("revision_posts")
+}
+
+model RevisionInteraction {
+  id            String   @id
+  postId        String
+  studentId     String
+  liked         Boolean
+  saved         Boolean
+  priority      Boolean
+  understanding String?
+  updatedAt     DateTime
+
+  @@map("revision_interactions")
+}
+
+model RevisionReview {
+  id        String   @id
+  postId    String
+  studentId String
+  message   String
+  createdAt DateTime
+  updatedAt DateTime
+
+  @@map("revision_reviews")
+}
+
+model Meeting {
+  id           String   @id
+  createdById  String
+  recipientId  String?
+  classroomId  String?
+  audience     String
+  title        String
+  description  String
+  status       String
+  scheduledAt  DateTime?
+  preferredAt  DateTime?
+  durationMins Int
+  location     String?
+  meetingUrl   String?
+  createdAt    DateTime
+  updatedAt    DateTime
+
+  @@map("meetings")
+}

@@ -1,31 +1,24 @@
 const express = require('express');
-const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 const crypto = require('crypto');
+const https = require('https');
 const prisma = require('../lib/prisma');
+const { createUploadSignature } = require('../lib/cloudinary');
 const { requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 const uploadDir = path.join(__dirname, '../../uploads/revision');
-fs.mkdirSync(uploadDir, { recursive: true });
-
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: uploadDir,
-    filename: (req, file, callback) => callback(null, `${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`)
-  }),
-  limits: { fileSize: 75 * 1024 * 1024 },
-  fileFilter: (req, file, callback) => {
-    if (/^(image\/|video\/)/.test(file.mimetype)) return callback(null, true);
-    callback(new Error('Only image and video files are supported'));
-  }
-});
 
 const getPost = (postId) => prisma.revisionPost.findUnique({
   where: { id: postId },
   include: { subject: { include: { classroom: true } } }
 });
+
+const canAccessPost = async (post, user) => user.role === 'TEACHER'
+  ? post.subject.classroom.teacherId === user.id
+  : !!await prisma.classEnrollment.findUnique({
+    where: { classroomId_studentId: { classroomId: post.subject.classroomId, studentId: user.id } }
+  });
 
 router.get('/subjects', async (req, res, next) => {
   try {
@@ -43,31 +36,89 @@ router.get('/subjects', async (req, res, next) => {
   }
 });
 
-router.get('/media/:filename', async (req, res, next) => {
+router.post('/upload-signature', requireRole('TEACHER'), async (req, res, next) => {
   try {
-    const filename = path.basename(req.params.filename);
-    if (filename !== req.params.filename) {
-      res.status(404);
-      throw new Error('Revision media not found');
+    const { subjectId } = req.body;
+    const subject = await prisma.subject.findFirst({
+      where: { id: subjectId, classroom: { teacherId: req.user.id } }
+    });
+    if (!subject) {
+      res.status(403);
+      throw new Error('Not authorized to upload media for this subject');
     }
-    const post = await prisma.revisionPost.findFirst({
-      where: { mediaUrl: `/revision/media/${filename}` },
+
+    const publicId = `reelearn/revision/${crypto.randomUUID()}`;
+    const timestamp = Math.floor(Date.now() / 1000);
+    const signature = createUploadSignature(publicId, timestamp);
+    res.json({ ...signature, publicId, timestamp });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/media/:mediaId', async (req, res, next) => {
+  try {
+    const mediaId = req.params.mediaId;
+    let post = await prisma.revisionPost.findFirst({
+      where: { mediaUrl: `/revision/media/${mediaId}` },
       include: { subject: { include: { classroom: true } } }
     });
-    if (!post) {
+    if (!post) post = await prisma.revisionPost.findUnique({
+      where: { id: mediaId },
+      include: { subject: { include: { classroom: true } } }
+    });
+    const isLegacyFile = !!post?.mediaUrl?.startsWith('/revision/media/');
+    if (!post || !post.mediaUrl) {
       res.status(404);
       throw new Error('Revision media not found');
     }
-    const authorized = req.user.role === 'TEACHER'
-      ? post.subject.classroom.teacherId === req.user.id
-      : !!await prisma.classEnrollment.findUnique({
-        where: { classroomId_studentId: { classroomId: post.subject.classroomId, studentId: req.user.id } }
-      });
-    if (!authorized) {
+    if (!await canAccessPost(post, req.user)) {
       res.status(403);
       throw new Error('Not authorized to view this revision media');
     }
-    res.sendFile(path.join(uploadDir, filename));
+
+    if (isLegacyFile) {
+      const filename = path.basename(post.mediaUrl);
+      if (filename !== post.mediaUrl.slice('/revision/media/'.length)) {
+        res.status(404);
+        throw new Error('Revision media not found');
+      }
+      res.sendFile(path.join(uploadDir, filename), error => {
+        if (error) next(error);
+      });
+      return;
+    }
+
+    let mediaUrl;
+    try {
+      mediaUrl = new URL(post.mediaUrl);
+    } catch (error) {
+      res.status(502);
+      throw new Error('Stored revision media URL is invalid');
+    }
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+    if (mediaUrl.protocol !== 'https:' || mediaUrl.hostname !== 'res.cloudinary.com' || !cloudName || mediaUrl.pathname.split('/')[1] !== cloudName) {
+      res.status(502);
+      throw new Error('Stored revision media URL is invalid');
+    }
+    const request = https.get(mediaUrl, {
+      headers: req.headers.range ? { Range: req.headers.range } : {}
+    }, upstream => {
+      res.status(upstream.statusCode || 502);
+      for (const header of ['content-type', 'content-length', 'content-range', 'accept-ranges']) {
+        if (upstream.headers[header]) res.setHeader(header, upstream.headers[header]);
+      }
+      res.setHeader('Cache-Control', 'private, no-store');
+      upstream.on('error', error => {
+        if (res.headersSent) res.destroy(error);
+        else next(error);
+      });
+      upstream.pipe(res);
+    });
+    request.on('error', error => {
+      if (res.headersSent) res.destroy(error);
+      else next(error);
+    });
   } catch (error) {
     next(error);
   }
@@ -106,6 +157,7 @@ router.get('/posts', async (req, res, next) => {
       const myInteraction = interactions.find(item => item.studentId === req.user.id) || null;
       return {
         ...post,
+        mediaUrl: post.mediaUrl ? `/revision/media/${post.id}` : null,
         likes: isTeacher ? interactions.length : interactions.filter(item => item.liked).length,
         interaction: isTeacher ? null : myInteraction,
         review: isTeacher ? undefined : (reviews[0] || null),
@@ -117,11 +169,10 @@ router.get('/posts', async (req, res, next) => {
   }
 });
 
-router.post('/posts', requireRole('TEACHER'), upload.single('media'), async (req, res, next) => {
+router.post('/posts', requireRole('TEACHER'), async (req, res, next) => {
   try {
-    const { subjectId, title, content = '' } = req.body;
-    if (!subjectId || !title?.trim() || (!content.trim() && !req.file)) {
-      if (req.file) fs.unlink(req.file.path, () => {});
+    const { subjectId, title, content = '', mediaUrl, mediaType } = req.body;
+    if (!subjectId || !title?.trim() || (!content.trim() && !mediaUrl)) {
       res.status(400);
       throw new Error('Choose a subject, add a title, and provide notes or media');
     }
@@ -129,9 +180,25 @@ router.post('/posts', requireRole('TEACHER'), upload.single('media'), async (req
       where: { id: subjectId, classroom: { teacherId: req.user.id } }
     });
     if (!subject) {
-      if (req.file) fs.unlink(req.file.path, () => {});
       res.status(403);
       throw new Error('Not authorized to post in this subject');
+    }
+    if (mediaUrl) {
+      let parsedMediaUrl;
+      try {
+        parsedMediaUrl = new URL(mediaUrl);
+      } catch (error) {
+        res.status(400);
+        throw new Error('Invalid revision media URL');
+      }
+      if (!['IMAGE', 'VIDEO'].includes(mediaType)
+        || parsedMediaUrl.protocol !== 'https:'
+        || parsedMediaUrl.hostname !== 'res.cloudinary.com'
+        || parsedMediaUrl.pathname.split('/')[1] !== process.env.CLOUDINARY_CLOUD_NAME
+        || !parsedMediaUrl.pathname.includes(`/${mediaType === 'IMAGE' ? 'image' : 'video'}/upload/`)) {
+        res.status(400);
+        throw new Error('Revision media must be uploaded to this Cloudinary account');
+      }
     }
     const post = await prisma.revisionPost.create({
       data: {
@@ -139,12 +206,18 @@ router.post('/posts', requireRole('TEACHER'), upload.single('media'), async (req
         createdById: req.user.id,
         title: title.trim(),
         content: content.trim(),
-        mediaUrl: req.file ? `/revision/media/${req.file.filename}` : null,
-        mediaType: req.file?.mimetype.startsWith('image/') ? 'IMAGE' : req.file ? 'VIDEO' : null
+        mediaUrl: mediaUrl || null,
+        mediaType: mediaUrl ? mediaType : null
       },
       include: { subject: { include: { classroom: { select: { id: true, name: true, section: true } } } }, createdBy: { select: { name: true } } }
     });
-    res.status(201).json({ ...post, likes: 0, interaction: null, reviews: [] });
+    res.status(201).json({
+      ...post,
+      mediaUrl: post.mediaUrl ? `/revision/media/${post.id}` : null,
+      likes: 0,
+      interaction: null,
+      reviews: []
+    });
   } catch (error) {
     next(error);
   }
