@@ -1,7 +1,8 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const prisma = require('../lib/prisma');
+const prisma = require('../lib/store');
+const { ensureConfiguredPrincipal } = require('../lib/principal');
 const { verifyToken } = require('../middleware/auth');
 
 const router = express.Router();
@@ -60,7 +61,10 @@ router.post('/login', async (req, res, next) => {
       throw new Error('Email and password are required');
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    let user = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
+    if (!user) {
+      user = await ensureConfiguredPrincipal(email);
+    }
     if (!user) {
       res.status(401);
       throw new Error('Invalid credentials');
@@ -93,8 +97,7 @@ router.post('/login', async (req, res, next) => {
 
 router.get('/me', verifyToken, async (req, res, next) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
-    res.json(publicUser(user));
+    res.json(publicUser(req.user));
   } catch (error) {
     next(error);
   }

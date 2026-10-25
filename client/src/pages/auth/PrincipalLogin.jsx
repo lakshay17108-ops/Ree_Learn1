@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { BookOpen, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import api from '../../api/axios';
 import { useAuth } from '../../hooks/useAuth';
 import { Button } from '../../components/ui';
+import { LegalLinks } from '../PolicyPage';
 
 export const PrincipalLogin = () => {
   const [form, setForm] = useState({ email: '', password: '' });
@@ -41,12 +42,12 @@ export const PrincipalLogin = () => {
           <div className="absolute bottom-20 right-20 w-96 h-96 bg-indigo-500 rounded-full blur-3xl" />
         </div>
         <div className="relative z-10 text-center">
-          <div className="inline-flex items-center gap-3 mb-8">
+          <Link to="/" aria-label="EduTrack home" className="inline-flex items-center gap-3 mb-8">
             <div className="w-14 h-14 rounded-2xl bg-teal-600 flex items-center justify-center shadow-xl shadow-teal-900">
               <BookOpen className="w-7 h-7 text-white" />
             </div>
             <span className="text-3xl font-bold text-white tracking-wide">EduTrack</span>
-          </div>
+          </Link>
           <div className="space-y-4 max-w-md">
             <h2 className="text-4xl font-bold text-white leading-snug">School Authority Portal</h2>
             <p className="text-slate-400 text-lg">
@@ -73,12 +74,12 @@ export const PrincipalLogin = () => {
       <div className="flex-1 flex items-center justify-center px-6 py-12 bg-[#f8fafc]">
         <div className="w-full max-w-md">
           {/* Mobile brand */}
-          <div className="flex items-center gap-2 mb-8 lg:hidden">
+          <Link to="/" aria-label="EduTrack home" className="flex items-center gap-2 mb-8 lg:hidden">
             <div className="w-9 h-9 rounded-xl bg-teal-700 flex items-center justify-center">
               <BookOpen className="w-5 h-5 text-white" />
             </div>
             <span className="text-xl font-bold text-slate-900">EduTrack</span>
-          </div>
+          </Link>
 
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-2">
@@ -105,7 +106,6 @@ export const PrincipalLogin = () => {
                 value={form.email}
                 onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
                 className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-transparent transition"
-                placeholder="principal@school.edu"
               />
             </div>
 
@@ -119,7 +119,6 @@ export const PrincipalLogin = () => {
                   value={form.password}
                   onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
                   className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-transparent transition"
-                  placeholder="••••••••"
                 />
                 <button
                   type="button"
@@ -146,8 +145,9 @@ export const PrincipalLogin = () => {
           <p className="mt-8 text-center text-xs text-slate-400">
             This portal is restricted to school principals and higher authorities only.<br />
             <span className="text-slate-500">Students and teachers use the</span>{' '}
-            <a href="/login" className="text-teal-700 font-medium hover:underline">main login page</a>.
+            <Link to="/login" className="text-teal-700 font-medium hover:underline">main login page</Link>.
           </p>
+          <LegalLinks className="mt-4 justify-center" />
         </div>
       </div>
     </div>

@@ -1,43 +1,34 @@
 # Deploy the app on Vercel
 
-Vercel hosts the React frontend and Express API functions from one project. PostgreSQL and Cloudinary remain managed external services; Vercel does not provide the PostgreSQL server or Cloudinary storage itself.
+This repository is configured as one Vercel project. Vercel serves the React app and runs the Express API as a Function. PostgreSQL and Cloudinary are separate managed services and must be configured before using the deployed app.
 
-## Prepare external services
+## Configure Vercel
 
-1. Create a PostgreSQL database with a provider available to your Vercel project. Copy its pooled connection string into `DATABASE_URL`; if the provider supplies a direct connection string, also set `DIRECT_URL`.
-2. Create a Cloudinary account and note its cloud name, API key, and API secret.
-3. If you need the records in the local SQLite database, first follow [server/DATABASE_MIGRATION.md](./server/DATABASE_MIGRATION.md) with the PostgreSQL and Cloudinary credentials. Keep backups until the deployed data is verified.
-
-## Deploy
-
-1. Push this repository to GitHub and import it into Vercel.
-2. Set the Vercel project root directory to the repository root (not `client` or `server`).
-3. Add these Vercel environment variables for Production and any Preview environments you plan to use:
-   - `DATABASE_URL` — PostgreSQL pooled connection string.
-   - `DIRECT_URL` — direct PostgreSQL connection string, if provided by your database provider; otherwise use the same value as `DATABASE_URL`.
-   - `JWT_SECRET` — a long, random secret.
+1. Create a PostgreSQL database and a Cloudinary account.
+2. Import the GitHub repository into Vercel. Set the project root to the repository root, not `client` or `server`. Use the **Other** framework preset if Vercel asks for one.
+3. Add these environment variables to Vercel for Production and any Preview environments you use:
+   - `DATABASE_URL` — PostgreSQL connection string, preferably the provider's pooled/serverless URL.
+   - `JWT_SECRET` — a long, random signing secret.
    - `CLOUDINARY_CLOUD_NAME`
    - `CLOUDINARY_API_KEY`
    - `CLOUDINARY_API_SECRET`
-   - `CLIENT_URL` — optional for the same-origin production UI; set the exact frontend origin(s), comma-separated, if using preview URLs or a separate domain.
-4. Deploy. The root `vercel.json` installs the server and client dependencies, generates Prisma Client, builds the Vite app, and serves the API through `api/[...path].js`.
-5. Initialize or update the PostgreSQL schema from a trusted local terminal with the production environment values loaded (for example, use the Vercel CLI to pull the Production environment into a local env file, and do not commit that file):
+   - `PRINCIPAL_EMAIL` and `PRINCIPAL_PASSWORD` — optional initial principal account; the password must be unique and at least 12 characters.
+   - `PRINCIPAL_NAME` — optional display name.
+   - `CLIENT_URL` — optional; same-origin requests are allowed automatically. Set exact origin(s), comma-separated, only when using a separate domain or preview URL.
+4. Deploy. Root `vercel.json` installs both workspaces, builds the server and client, publishes `client/dist`, and routes API requests to `api/[...path].js`. The API requires `DATABASE_URL`; its first health/API request initializes the PostgreSQL JSONB store.
+5. Visit `https://<your-deployment>/api/health` and confirm the response reports `"storage":"postgresql"`.
+6. Sign in once using the configured principal email and password. The principal account is created on the first successful sign-in. After that, remove `PRINCIPAL_PASSWORD` from Vercel if you no longer need the auto-provisioning fallback.
 
-   ```sh
-   npm --prefix server ci --include=dev
-   npm --prefix server run db:generate
-   npm --prefix server run db:push
-   ```
+Do not set `VITE_API_URL` to another host for this deployment. The client defaults to the same-origin `/api` path. Never add server secrets to `VITE_*` variables or commit them to the repository.
 
-   Do not run the seed script on a database whose records you need; it deletes data.
-6. Create the principal account using the instructions in [server/PRINCIPAL_SETUP.md](./server/PRINCIPAL_SETUP.md). Run the command in an environment that has the production `DATABASE_URL`.
+## Database and existing data
 
-The frontend calls the API at `/api` on the same Vercel domain. Vercel's SPA rewrite serves React routes, and the API catch-all handles `/api/...`.
+The current server uses a PostgreSQL-backed JSONB store rather than Prisma's normalized tables. It automatically creates its store table on first use; no Prisma generate, migration, or schema-push step is needed. Read [server/JSON_STORE.md](./server/JSON_STORE.md) for storage behavior and scaling limitations.
 
-## Uploads and limitations
+The old SQLite file is not imported automatically. Keep `server/prisma/dev.db` and any local media as backups. The previous SQLite-to-Prisma importer is not compatible with the current JSONB store; existing records need a deliberate export/import before going live.
 
-Revision images and videos upload directly from the browser to Cloudinary using short-lived signed upload parameters generated by the authenticated API. The Cloudinary API secret stays on the server. The API function does not receive the media file body, avoiding Vercel function request-body limits. Media reads still pass through the authenticated API.
+## Revision uploads
 
-Vercel Functions have execution-duration and response limits. Test video playback, range requests, login, registration, and database access after deployment. Keep media within the app's 75 MB upload limit. The free tiers and usage limits of Vercel, PostgreSQL, and Cloudinary can change; confirm current limits before relying on this deployment for real users.
+Images and videos are signed by the API and uploaded directly from the browser to Cloudinary. Media file bodies do not pass through Vercel Functions. Cloudinary assets are public by default, so anyone who obtains an asset URL may be able to view it; do not treat the URL as private authorization. Test image/video uploads and playback after deployment.
 
-Vercel deploys immutable serverless functions, not a continuously running Node server. Local SQLite data and local upload files are not production storage; use PostgreSQL and Cloudinary.
+Vercel Functions are not a continuously running server, and provider limits or free-tier policies can change. Confirm current Vercel, PostgreSQL, and Cloudinary limits before relying on this deployment for real users.

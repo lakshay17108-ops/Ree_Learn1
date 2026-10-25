@@ -91,7 +91,6 @@ export const QuestionTracker = () => {
             <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Topic</label>
             <input
               type="text"
-              placeholder="Search topic..."
               className={inputCls}
               value={filters.topic}
               onChange={e => setFilters(f => ({ ...f, topic: e.target.value }))}

@@ -1,21 +1,37 @@
 # Principal account setup
 
-Teacher accounts created through registration remain pending until a principal approves them. Principal accounts cannot be created through public registration.
+Principal credentials are secrets: do not commit them to source control or send
+them in chat.
 
-After installing server dependencies and syncing the Prisma schema, create the first principal from PowerShell:
+## Vercel deployment
 
-For PostgreSQL setup or migration from the previous SQLite database, see [DATABASE_MIGRATION.md](./DATABASE_MIGRATION.md).
+In the Vercel project, open **Settings → Environment
+Variables** and add these variables for the environments where the API is
+deployed:
 
-```powershell
-Push-Location server
-$env:PRINCIPAL_EMAIL = "principal@your-school.edu"
-$securePassword = Read-Host "Principal password (12+ characters)" -AsSecureString
-$env:PRINCIPAL_PASSWORD = [System.Net.NetworkCredential]::new("", $securePassword).Password
-npm run principal:create
-Remove-Item Env:PRINCIPAL_EMAIL, Env:PRINCIPAL_PASSWORD
-Pop-Location
-```
+- `JWT_SECRET`: a long, random signing secret.
+- `PRINCIPAL_EMAIL`: the principal's email address.
+- `PRINCIPAL_PASSWORD`: a new, unique password with at least 12 characters.
+- `PRINCIPAL_NAME`: optional display name.
+- `DATABASE_URL`: the PostgreSQL connection URL from your database provider.
+  Prefer its pooled/serverless connection string if available.
 
-The command only creates a new account; it refuses to change an existing account. Sign in with that account to approve teachers, review class enrollment and quiz records, and manage school meetings.
+Redeploy the API after adding or changing these variables. On the first
+successful principal sign-in, the API creates the configured account if it
+doesn't already exist. The principal then signs in at `/principal-login`.
 
-The principal overview reports quiz attempts and scores currently recorded by the app. Attendance and other offline activity are not tracked.
+If the configured email already belongs to a non-principal account, change the
+environment variable to a different email. Existing principal accounts are not
+silently overwritten when the environment password changes.
+
+## Local development
+
+Copy `.env.example` to `.env` in the `server` directory, then replace the
+principal placeholders and `JWT_SECRET` with local values. `.env` is ignored by
+Git and must not be committed.
+
+## Storage warning
+
+The API uses PostgreSQL for shared app data when `DATABASE_URL` is set. The
+previous Vercel `/tmp` JSON data is not durable and cannot be migrated
+automatically. Users and other records from that store may need to be recreated.

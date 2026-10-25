@@ -4,6 +4,7 @@ import { BookOpen } from 'lucide-react';
 import api from '../../api/axios';
 import { useAuth } from '../../hooks/useAuth';
 import { Button } from '../../components/ui';
+import { LegalLinks } from '../PolicyPage';
 
 export const Register = () => {
   const [formData, setFormData] = useState({ name: '', email: '', password: '', confirmPassword: '', role: 'STUDENT' });
@@ -43,7 +44,9 @@ export const Register = () => {
     <div className="min-h-screen flex items-center justify-center bg-surface py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-sm border border-border">
         <div className="flex flex-col items-center">
-          <BookOpen className="w-12 h-12 text-brand" />
+          <Link to="/" aria-label="EduTrack home" className="rounded-lg focus:outline-none focus:ring-2 focus:ring-brand">
+            <BookOpen className="w-12 h-12 text-brand" />
+          </Link>
           <h2 className="mt-6 text-3xl font-extrabold text-slate-900">Create an account</h2>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -90,6 +93,7 @@ export const Register = () => {
           <div className="text-sm text-center">
             <Link to="/login" className="font-medium text-brand hover:text-brand-dark">Already have an account? Sign in</Link>
           </div>
+          <LegalLinks className="justify-center" />
         </form>
       </div>
     </div>

@@ -4,6 +4,7 @@ import { BookOpen } from 'lucide-react';
 import api from '../../api/axios';
 import { useAuth } from '../../hooks/useAuth';
 import { Button } from '../../components/ui';
+import { LegalLinks } from '../PolicyPage';
 
 export const Login = () => {
   const [email, setEmail] = useState('');
@@ -34,7 +35,9 @@ export const Login = () => {
     <div className="min-h-screen flex items-center justify-center bg-surface py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-sm border border-border">
         <div className="flex flex-col items-center">
-          <BookOpen className="w-12 h-12 text-brand" />
+          <Link to="/" aria-label="EduTrack home" className="rounded-lg focus:outline-none focus:ring-2 focus:ring-brand">
+            <BookOpen className="w-12 h-12 text-brand" />
+          </Link>
           <h2 className="mt-6 text-3xl font-extrabold text-slate-900">Sign in to your account</h2>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -67,7 +70,7 @@ export const Login = () => {
               Don't have an account? Register
             </Link>
           </div>
-
+          <LegalLinks className="justify-center" />
         </form>
       </div>
     </div>

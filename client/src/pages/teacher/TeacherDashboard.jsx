@@ -16,23 +16,17 @@ export const TeacherDashboard = () => {
   const [showNewClassModal, setShowNewClassModal] = useState(false);
   const [form, setForm] = useState({ name: '', section: '' });
   const [copiedCode, setCopiedCode] = useState(null);
+  const [actionError, setActionError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading, isError: statsError } = useQuery({
     queryKey: ['teacher-stats'],
-    queryFn: async () => {
-      const res = await api.get('/analytics/dashboard/teacher').catch(() => ({
-        data: { classroomCount: 0, studentCount: 0, quizCount: 0, avgScore: 0 }
-      }));
-      return res.data;
-    }
+    queryFn: async () => (await api.get('/analytics/dashboard/teacher')).data
   });
 
-  const { data: classrooms, isLoading: classesLoading } = useQuery({
+  const { data: classrooms, isLoading: classesLoading, isError: classesError } = useQuery({
     queryKey: ['classrooms'],
-    queryFn: async () => {
-      const res = await api.get('/classrooms').catch(() => ({ data: [] }));
-      return res.data;
-    }
+    queryFn: async () => (await api.get('/classrooms')).data
   });
 
   const createClassMutation = useMutation({
@@ -42,13 +36,21 @@ export const TeacherDashboard = () => {
       queryClient.invalidateQueries(['teacher-stats']);
       setShowNewClassModal(false);
       setForm({ name: '', section: '' });
-    }
+      setSuccessMessage('Classroom created successfully.');
+    },
+    onError: error => setActionError(error.response?.data?.error || 'Could not create the classroom. Please try again.')
   });
 
-  const copyCode = (code) => {
-    navigator.clipboard.writeText(code);
-    setCopiedCode(code);
-    setTimeout(() => setCopiedCode(null), 2000);
+  const copyCode = async (code) => {
+    setActionError('');
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      setSuccessMessage('Join code copied.');
+      setTimeout(() => setCopiedCode(null), 2000);
+    } catch {
+      setActionError('Could not copy the join code. Please select and copy it manually.');
+    }
   };
 
   if (statsLoading || classesLoading) {
@@ -62,6 +64,8 @@ export const TeacherDashboard = () => {
         <h1 className="text-2xl font-bold text-[#0f172a]">Welcome back, {user?.name?.split(' ')[0]}!</h1>
         <p className="text-slate-500 mt-1 text-sm">Here's an overview of your classes and students.</p>
       </div>
+      {(statsError || classesError || actionError) && <p role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{actionError || 'Some dashboard information could not be loaded. Please refresh and try again.'}</p>}
+      {successMessage && <p role="status" className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{successMessage}</p>}
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
@@ -141,7 +145,6 @@ export const TeacherDashboard = () => {
             <label className="block text-sm font-medium text-[#0f172a] mb-1.5">Class Name</label>
             <input
               type="text"
-              placeholder="e.g. Grade 10"
               value={form.name}
               onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
               className="w-full border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
@@ -151,7 +154,6 @@ export const TeacherDashboard = () => {
             <label className="block text-sm font-medium text-[#0f172a] mb-1.5">Section</label>
             <input
               type="text"
-              placeholder="e.g. A"
               value={form.section}
               onChange={e => setForm(f => ({ ...f, section: e.target.value }))}
               className="w-full border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
@@ -168,6 +170,7 @@ export const TeacherDashboard = () => {
             Create Classroom
           </Button>
         </div>
+        {createClassMutation.isError && <p role="alert" className="mt-3 text-sm text-red-700">{createClassMutation.error.response?.data?.error || 'Could not create the classroom. Please try again.'}</p>}
       </Modal>
     </AppShell>
   );

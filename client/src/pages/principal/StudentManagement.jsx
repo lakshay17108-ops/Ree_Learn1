@@ -49,7 +49,7 @@ const StudentDetail = ({ studentId, onBack }) => {
           <div className="flex-1 min-w-0">
             <h2 className="text-xl font-bold text-slate-900 mb-2">{data.name}</h2>
             <div className="flex flex-wrap gap-4 text-sm text-slate-500">
-              <span className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" />{data.email}</span>
+              <a href={`mailto:${data.email}`} className="flex items-center gap-1.5 hover:text-indigo-700"><Mail className="w-3.5 h-3.5" />{data.email}</a>
               <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />Joined {new Date(data.createdAt).toLocaleDateString()}</span>
             </div>
           </div>
@@ -230,7 +230,6 @@ export const StudentManagement = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Search by name, email or classroom…"
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-600 bg-white"
@@ -283,7 +282,7 @@ export const StudentManagement = () => {
                           </div>
                           <div>
                             <p className="font-medium text-slate-900">{student.name}</p>
-                            <p className="text-xs text-slate-500">{student.email}</p>
+                            <a href={`mailto:${student.email}`} className="text-xs text-slate-500 hover:text-indigo-700">{student.email}</a>
                           </div>
                         </div>
                       </td>

@@ -32,6 +32,7 @@ export const MeetingHub = () => {
   const [tab, setTab] = useState('ALL');
   const [responseDrafts, setResponseDrafts] = useState({});
   const [formError, setFormError] = useState('');
+  const [statusMessage, setStatusMessage] = useState('');
   const [draft, setDraft] = useState({ audience: 'INDIVIDUAL', recipientId: '', classroomId: '', title: '', description: '', scheduledAt: futureDateTime(), preferredAt: '', durationMins: 30, location: '', meetingUrl: '' });
 
   const { data: options, isLoading: loadingOptions } = useQuery({
@@ -50,6 +51,7 @@ export const MeetingHub = () => {
       refreshMeetings();
       setShowModal(false);
       setFormError('');
+      setStatusMessage(isStudent ? 'Meeting request sent.' : 'Meeting scheduled successfully.');
       setDraft({ audience: 'INDIVIDUAL', recipientId: '', classroomId: '', title: '', description: '', scheduledAt: futureDateTime(), preferredAt: '', durationMins: 30, location: '', meetingUrl: '' });
     },
     onError: error => setFormError(error.response?.data?.error || 'Could not create this meeting.')
@@ -59,12 +61,16 @@ export const MeetingHub = () => {
     mutationFn: ({ meetingId, payload }) => api.put(`/meetings/${meetingId}`, payload),
     onSuccess: (_, variables) => {
       setResponseDrafts(current => ({ ...current, [variables.meetingId]: undefined }));
+      setStatusMessage(variables.payload.status === 'DECLINED' ? 'Meeting request declined.' : 'Meeting request scheduled.');
       refreshMeetings();
     }
   });
   const cancelMutation = useMutation({
     mutationFn: meetingId => api.put(`/meetings/${meetingId}`, { status: 'CANCELLED' }),
-    onSuccess: refreshMeetings
+    onSuccess: () => {
+      setStatusMessage('Meeting cancelled.');
+      refreshMeetings();
+    }
   });
 
   const people = useMemo(() => {
@@ -127,6 +133,7 @@ export const MeetingHub = () => {
           </div>
           <Button onClick={openComposer} disabled={loadingOptions}><Plus className="mr-1.5 h-4 w-4" /> {isStudent ? 'Request a meeting' : 'Schedule a meeting'}</Button>
         </header>
+        {statusMessage && <p role="status" className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{statusMessage}</p>}
 
         <div className="mb-5 flex border-b border-slate-200">
           {[
@@ -172,13 +179,14 @@ export const MeetingHub = () => {
                 <div className="grid gap-2 sm:grid-cols-[1.3fr_100px_1fr_1.3fr]">
                   <label className="text-xs text-slate-600">Schedule at<input className={fieldClass} type="datetime-local" min={futureDateTime()} value={response.scheduledAt} onChange={event => setResponseDrafts(current => ({ ...current, [meeting.id]: { ...response, scheduledAt: event.target.value } }))} /></label>
                   <label className="text-xs text-slate-600">Minutes<input className={fieldClass} type="number" min="15" max="240" step="15" value={response.durationMins} onChange={event => setResponseDrafts(current => ({ ...current, [meeting.id]: { ...response, durationMins: event.target.value } }))} /></label>
-                  <label className="text-xs text-slate-600">Location<input className={fieldClass} placeholder="Room or office" value={response.location || ''} onChange={event => setResponseDrafts(current => ({ ...current, [meeting.id]: { ...response, location: event.target.value } }))} /></label>
-                  <label className="text-xs text-slate-600">Meeting link<input className={fieldClass} type="url" placeholder="https://..." value={response.meetingUrl || ''} onChange={event => setResponseDrafts(current => ({ ...current, [meeting.id]: { ...response, meetingUrl: event.target.value } }))} /></label>
+                  <label className="text-xs text-slate-600">Location<input className={fieldClass} value={response.location || ''} onChange={event => setResponseDrafts(current => ({ ...current, [meeting.id]: { ...response, location: event.target.value } }))} /></label>
+                  <label className="text-xs text-slate-600">Meeting link<input className={fieldClass} type="url" value={response.meetingUrl || ''} onChange={event => setResponseDrafts(current => ({ ...current, [meeting.id]: { ...response, meetingUrl: event.target.value } }))} /></label>
                 </div>
                 <div className="mt-3 flex gap-2"><Button size="sm" loading={responseMutation.isPending} onClick={() => respondToRequest(meeting, 'SCHEDULED')}><CalendarDays className="mr-1.5 h-3.5 w-3.5" /> Schedule</Button><Button size="sm" variant="secondary" disabled={responseMutation.isPending} onClick={() => respondToRequest(meeting, 'DECLINED')}><X className="mr-1 h-3.5 w-3.5" /> Decline</Button></div>
               </div>}
               {(isOrganizer || isPrincipal) && !['CANCELLED', 'DECLINED'].includes(meeting.status) && <div className="mt-4 flex justify-end border-t border-slate-100 pt-3"><button disabled={cancelMutation.isPending} onClick={() => cancelMutation.mutate(meeting.id)} className="text-xs font-medium text-slate-500 hover:text-red-700">Cancel meeting</button></div>}
               {responseMutation.isError && responseMutation.variables?.meetingId === meeting.id && <p role="alert" className="mt-2 text-xs text-red-700">{responseMutation.error.response?.data?.error || 'Could not update this request.'}</p>}
+              {cancelMutation.isError && cancelMutation.variables === meeting.id && <p role="alert" className="mt-2 text-xs text-red-700">{cancelMutation.error.response?.data?.error || 'Could not cancel this meeting.'}</p>}
             </article>;
           })}
         </div>
@@ -208,12 +216,12 @@ export const MeetingHub = () => {
             </select>
           </label>}
 
-          <label className="block text-sm font-medium text-slate-700">Meeting title<input required maxLength={120} className={fieldClass} placeholder={isStudent ? 'What would you like to discuss?' : 'e.g. Grade 10 progress check-in'} value={draft.title} onChange={event => setDraft(current => ({ ...current, title: event.target.value }))} /></label>
-          <label className="block text-sm font-medium text-slate-700">Details<textarea maxLength={2000} className={`${fieldClass} min-h-24 resize-y`} placeholder={isStudent ? 'Share what you need help with.' : 'Add an agenda or useful context.'} value={draft.description} onChange={event => setDraft(current => ({ ...current, description: event.target.value }))} /></label>
+          <label className="block text-sm font-medium text-slate-700">Meeting title<input required maxLength={120} className={fieldClass} value={draft.title} onChange={event => setDraft(current => ({ ...current, title: event.target.value }))} /></label>
+          <label className="block text-sm font-medium text-slate-700">Details<textarea maxLength={2000} className={`${fieldClass} min-h-24 resize-y`} value={draft.description} onChange={event => setDraft(current => ({ ...current, description: event.target.value }))} /></label>
 
           {isStudent ? <label className="block text-sm font-medium text-slate-700">Preferred time <span className="font-normal text-slate-400">(optional)</span><input className={fieldClass} type="datetime-local" min={futureDateTime()} value={draft.preferredAt} onChange={event => setDraft(current => ({ ...current, preferredAt: event.target.value }))} /></label> : <>
             <div className="grid gap-3 sm:grid-cols-2"><label className="block text-sm font-medium text-slate-700">Date and time<input required className={fieldClass} type="datetime-local" min={futureDateTime()} value={draft.scheduledAt} onChange={event => setDraft(current => ({ ...current, scheduledAt: event.target.value }))} /></label><label className="block text-sm font-medium text-slate-700">Duration in minutes<input required className={fieldClass} type="number" min="15" max="240" step="15" value={draft.durationMins} onChange={event => setDraft(current => ({ ...current, durationMins: event.target.value }))} /></label></div>
-            <div className="grid gap-3 sm:grid-cols-2"><label className="block text-sm font-medium text-slate-700">Location <span className="font-normal text-slate-400">(optional)</span><input className={fieldClass} placeholder="Room or office" value={draft.location} onChange={event => setDraft(current => ({ ...current, location: event.target.value }))} /></label><label className="block text-sm font-medium text-slate-700">Meeting link <span className="font-normal text-slate-400">(optional)</span><input className={fieldClass} type="url" placeholder="https://..." value={draft.meetingUrl} onChange={event => setDraft(current => ({ ...current, meetingUrl: event.target.value }))} /></label></div>
+            <div className="grid gap-3 sm:grid-cols-2"><label className="block text-sm font-medium text-slate-700">Location <span className="font-normal text-slate-400">(optional)</span><input className={fieldClass} value={draft.location} onChange={event => setDraft(current => ({ ...current, location: event.target.value }))} /></label><label className="block text-sm font-medium text-slate-700">Meeting link <span className="font-normal text-slate-400">(optional)</span><input className={fieldClass} type="url" value={draft.meetingUrl} onChange={event => setDraft(current => ({ ...current, meetingUrl: event.target.value }))} /></label></div>
           </>}
 
           {isStudent && <p className="text-xs text-slate-500">This sends a private request. The teacher or principal will schedule a time or decline it.</p>}

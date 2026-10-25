@@ -1,5 +1,5 @@
 const express = require('express');
-const prisma = require('../lib/prisma');
+const prisma = require('../lib/store');
 const { requireRole } = require('../middleware/auth');
 const crypto = require('crypto');
 

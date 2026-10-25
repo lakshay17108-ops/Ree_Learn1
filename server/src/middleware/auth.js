@@ -1,7 +1,9 @@
 const jwt = require('jsonwebtoken');
-const prisma = require('../lib/prisma');
+const prisma = require('../lib/store');
+const { ensureConfiguredPrincipal, getConfiguredEmail } = require('../lib/principal');
 
 const verifyToken = async (req, res, next) => {
+  let decoded;
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -9,10 +11,17 @@ const verifyToken = async (req, res, next) => {
     }
 
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // We attach decoded to req.user first, but maybe we should fetch the user to ensure it exists
-    const user = await prisma.user.findUnique({ where: { id: decoded.id } });
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
+  } catch {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  try {
+    const isConfiguredPrincipal = decoded.role === 'PRINCIPAL'
+      && decoded.email?.trim().toLowerCase() === getConfiguredEmail();
+    const user = isConfiguredPrincipal
+      ? await ensureConfiguredPrincipal(decoded.email)
+      : await prisma.user.findUnique({ where: { id: decoded.id } });
     if (!user) {
       return res.status(401).json({ error: 'User not found' });
     }
@@ -21,9 +30,9 @@ const verifyToken = async (req, res, next) => {
     }
 
     req.user = user;
-    next();
+    return next();
   } catch (error) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    return next(error);
   }
 };
 

@@ -56,7 +56,7 @@ const TeacherDetail = ({ teacherId, onBack }) => {
             {statusBadge(data.approvalStatus)}
           </div>
           <div className="flex flex-wrap gap-4 text-sm text-slate-500 mt-2">
-            <span className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" />{data.email}</span>
+            <a href={`mailto:${data.email}`} className="flex items-center gap-1.5 hover:text-teal-700"><Mail className="w-3.5 h-3.5" />{data.email}</a>
             <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />Joined {new Date(data.createdAt).toLocaleDateString()}</span>
           </div>
         </div>
@@ -111,7 +111,7 @@ const TeacherDetail = ({ teacherId, onBack }) => {
                       <tr key={s.id} className="hover:bg-slate-50">
                         <td className="px-5 py-3">
                           <p className="font-medium text-slate-800">{s.name}</p>
-                          <p className="text-xs text-slate-500">{s.email}</p>
+                          <a href={`mailto:${s.email}`} className="text-xs text-slate-500 hover:text-teal-700">{s.email}</a>
                         </td>
                         <td className="px-5 py-3 text-slate-600">{s.quizzesTaken}</td>
                         <td className="px-5 py-3"><ScoreBar score={s.averageScore} /></td>
@@ -204,7 +204,6 @@ export const TeacherManagement = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Search teachers…"
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-600 bg-white"
@@ -251,7 +250,7 @@ export const TeacherManagement = () => {
                           </div>
                           <div>
                             <p className="font-medium text-slate-900">{teacher.name}</p>
-                            <p className="text-xs text-slate-500">{teacher.email}</p>
+                            <a href={`mailto:${teacher.email}`} className="text-xs text-slate-500 hover:text-teal-700">{teacher.email}</a>
                           </div>
                         </div>
                       </td>

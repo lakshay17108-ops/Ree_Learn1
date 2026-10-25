@@ -22,28 +22,19 @@ export const StudentDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading, isError: statsError } = useQuery({
     queryKey: ['student-stats'],
-    queryFn: async () => {
-      const res = await api.get('/analytics/dashboard/student').catch(() => ({ data: { quizzesTaken: 0, avgScore: 0, pendingCount: 0 } }));
-      return res.data;
-    }
+    queryFn: async () => (await api.get('/analytics/dashboard/student')).data
   });
 
-  const { data: pending, isLoading: pendingLoading } = useQuery({
+  const { data: pending, isLoading: pendingLoading, isError: pendingError } = useQuery({
     queryKey: ['assignments-pending'],
-    queryFn: async () => {
-      const res = await api.get('/assignments/mine/pending').catch(() => ({ data: [] }));
-      return res.data;
-    }
+    queryFn: async () => (await api.get('/assignments/mine/pending')).data
   });
 
-  const { data: attempts, isLoading: attemptsLoading } = useQuery({
+  const { data: attempts, isLoading: attemptsLoading, isError: attemptsError } = useQuery({
     queryKey: ['my-attempts'],
-    queryFn: async () => {
-      const res = await api.get('/attempts/mine').catch(() => ({ data: [] }));
-      return res.data;
-    }
+    queryFn: async () => (await api.get('/attempts/mine')).data
   });
 
   if (statsLoading || pendingLoading || attemptsLoading) {
@@ -59,9 +50,10 @@ export const StudentDashboard = () => {
         </div>
         <div>
           <h2 className="text-xl font-bold text-[#0f172a]">{user?.name}</h2>
-          <p className="text-slate-500 text-sm">{user?.email}</p>
+          {user?.email && <a href={`mailto:${user.email}`} className="text-sm text-slate-500 hover:text-[#4338ca]">{user.email}</a>}
           <p className="text-xs text-slate-400 mt-0.5">Student Account</p>
         </div>
+        {(statsError || pendingError || attemptsError) && <p role="alert" className="mb-5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">Some dashboard information could not be loaded. Please refresh and try again.</p>}
       </div>
 
       {/* Stats */}

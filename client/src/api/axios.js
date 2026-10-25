@@ -19,8 +19,18 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      localStorage.removeItem('reelearn_token');
-      window.location.href = '/login';
+      const requestUrl = error.config?.url || '';
+      const isAuthSubmission = ['/auth/login', '/auth/register']
+        .some((path) => requestUrl.endsWith(path));
+      if (!isAuthSubmission) {
+        localStorage.removeItem('reelearn_token');
+        window.location.href = '/login';
+      }
+    }
+    if (!error.response || error.response.status >= 500) {
+      window.dispatchEvent(new CustomEvent('reelearn:connection-error', {
+        detail: { offline: !navigator.onLine }
+      }));
     }
     return Promise.reject(error);
   }

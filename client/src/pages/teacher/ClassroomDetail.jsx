@@ -184,7 +184,7 @@ export const ClassroomDetail = () => {
                         {s.name}
                       </div>
                     </TableCell>
-                    <TableCell className="text-slate-500">{s.email}</TableCell>
+                    <TableCell className="text-slate-500"><a href={`mailto:${s.email}`} className="hover:text-[#4338ca]">{s.email}</a></TableCell>
                     <TableCell className="text-slate-400 text-xs">{formatDate(s.enrolledAt)}</TableCell>
                     <TableCell>
                       <button
@@ -246,7 +246,6 @@ export const ClassroomDetail = () => {
                 <input
                   type="text"
                   className={inputCls}
-                  placeholder="e.g. Mathematics"
                   value={subjectForm.name}
                   onChange={e => setSubjectForm(f => ({ ...f, name: e.target.value }))}
                 />
@@ -256,7 +255,6 @@ export const ClassroomDetail = () => {
                 <input
                   type="text"
                   className={inputCls}
-                  placeholder="e.g. MATH101"
                   value={subjectForm.code}
                   onChange={e => setSubjectForm(f => ({ ...f, code: e.target.value }))}
                 />

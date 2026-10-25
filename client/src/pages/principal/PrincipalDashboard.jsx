@@ -145,7 +145,7 @@ export const PrincipalDashboard = () => {
                 <div key={teacher.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
                   <div>
                     <p className="text-sm font-semibold text-slate-900">{teacher.name}</p>
-                    <p className="text-xs text-slate-500">{teacher.email} · requested {new Date(teacher.createdAt).toLocaleDateString()}</p>
+                    <p className="text-xs text-slate-500"><a href={`mailto:${teacher.email}`} className="hover:text-teal-700">{teacher.email}</a> · requested {new Date(teacher.createdAt).toLocaleDateString()}</p>
                   </div>
                   <div className="flex gap-2">
                     <Button

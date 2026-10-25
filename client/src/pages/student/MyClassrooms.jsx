@@ -153,7 +153,6 @@ export const MyClassrooms = () => {
             <input
               type="text"
               className={`${inputCls} font-mono text-lg text-center uppercase tracking-widest`}
-              placeholder="e.g. KRM10A"
               maxLength={10}
               value={joinCode}
               onChange={e => { setJoinCode(e.target.value.toUpperCase()); setJoinError(''); }}

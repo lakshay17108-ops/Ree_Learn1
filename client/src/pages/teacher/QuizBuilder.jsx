@@ -30,6 +30,7 @@ export const QuizBuilder = () => {
     difficulty: 'MEDIUM'
   });
   const [creating, setCreating] = useState(false);
+  const [questionFeedback, setQuestionFeedback] = useState('');
 
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -70,9 +71,10 @@ export const QuizBuilder = () => {
 
   const handleCreateAndAdd = async () => {
     if (!newQ.topic || !newQ.questionText || !newQ.explanation) return;
+    setQuestionFeedback('');
     const allOptionsFilled = ['A', 'B', 'C', 'D'].every(k => newQ.options[k]?.trim());
     if (!allOptionsFilled) {
-      alert('Please fill in all four answer options (A, B, C, D) before saving.');
+      setQuestionFeedback('Fill in all four answer options before saving.');
       return;
     }
     setCreating(true);
@@ -86,12 +88,13 @@ export const QuizBuilder = () => {
         difficulty: newQ.difficulty
       });
       setSelectedQuestions(prev => [...prev, { ...data, marks: 1 }]);
+      setQuestionFeedback('Question created and added to the quiz.');
       // Refresh the question bank so the new question appears
       queryClient.invalidateQueries({ queryKey: ['question-bank', quizInfo.subjectId] });
       setShowCreateForm(false);
       setNewQ({ topic: '', questionText: '', options: { A: '', B: '', C: '', D: '' }, correctOption: 'A', explanation: '', difficulty: 'MEDIUM' });
     } catch (e) {
-      alert('Failed to create question: ' + (e.response?.data?.error || e.message));
+      setQuestionFeedback(e.response?.data?.error || e.message || 'Could not create this question.');
     }
     setCreating(false);
   };
@@ -111,6 +114,7 @@ export const QuizBuilder = () => {
 
   return (
     <AppShell title="Quiz Builder">
+      {questionFeedback && <p role={questionFeedback.includes('created and added') ? 'status' : 'alert'} className={`mb-4 rounded-lg border p-3 text-sm ${questionFeedback.includes('created and added') ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-700'}`}>{questionFeedback}</p>}
       {/* Step indicator */}
       <div className="flex items-center gap-2 mb-8">
         {steps.map((label, i) => {
@@ -139,11 +143,11 @@ export const QuizBuilder = () => {
           <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); setStep(2); }}>
             <div>
               <label className="block text-sm font-medium text-[#0f172a] mb-1.5">Quiz Title *</label>
-              <input required className={inputCls} placeholder="e.g. Midterm Algebra" value={quizInfo.title} onChange={e => setQuizInfo(f => ({ ...f, title: e.target.value }))} />
+              <input required className={inputCls} value={quizInfo.title} onChange={e => setQuizInfo(f => ({ ...f, title: e.target.value }))} />
             </div>
             <div>
               <label className="block text-sm font-medium text-[#0f172a] mb-1.5">Description</label>
-              <textarea className={inputCls} rows="2" placeholder="Optional description..." value={quizInfo.description} onChange={e => setQuizInfo(f => ({ ...f, description: e.target.value }))} />
+              <textarea className={inputCls} rows="2" value={quizInfo.description} onChange={e => setQuizInfo(f => ({ ...f, description: e.target.value }))} />
             </div>
             <div>
               <label className="block text-sm font-medium text-[#0f172a] mb-1.5">Subject *</label>
@@ -268,7 +272,7 @@ export const QuizBuilder = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-[#0f172a] mb-1.5">Topic *</label>
-                    <input className={inputCls} placeholder="e.g. Quadratic Equations" value={newQ.topic} onChange={e => setNewQ(f => ({ ...f, topic: e.target.value }))} />
+                    <input className={inputCls} value={newQ.topic} onChange={e => setNewQ(f => ({ ...f, topic: e.target.value }))} />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-[#0f172a] mb-1.5">Difficulty</label>
@@ -281,7 +285,7 @@ export const QuizBuilder = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[#0f172a] mb-1.5">Question Text *</label>
-                  <textarea className={inputCls} rows="3" placeholder="Enter your question..." value={newQ.questionText} onChange={e => setNewQ(f => ({ ...f, questionText: e.target.value }))} />
+                  <textarea className={inputCls} rows="3" value={newQ.questionText} onChange={e => setNewQ(f => ({ ...f, questionText: e.target.value }))} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[#0f172a] mb-1.5">Options (select the correct answer)</label>
@@ -298,7 +302,6 @@ export const QuizBuilder = () => {
                         <span className="font-bold text-sm text-slate-500 w-5">{opt}.</span>
                         <input
                           className="flex-1 bg-transparent text-sm outline-none text-[#0f172a] placeholder-slate-400"
-                          placeholder={`Option ${opt}`}
                           value={newQ.options[opt]}
                           onChange={e => setNewQ(f => ({ ...f, options: { ...f.options, [opt]: e.target.value } }))}
                         />
@@ -308,7 +311,7 @@ export const QuizBuilder = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[#0f172a] mb-1.5">Explanation *</label>
-                  <textarea className={inputCls} rows="2" placeholder="Explain why the correct answer is correct..." value={newQ.explanation} onChange={e => setNewQ(f => ({ ...f, explanation: e.target.value }))} />
+                  <textarea className={inputCls} rows="2" value={newQ.explanation} onChange={e => setNewQ(f => ({ ...f, explanation: e.target.value }))} />
                 </div>
                 <div className="flex justify-between pt-2 border-t border-[#e2e8f0]">
                   <Button variant="secondary" onClick={() => setShowCreateForm(false)}>Cancel</Button>
@@ -358,6 +361,7 @@ export const QuizBuilder = () => {
               Publish Quiz
             </Button>
           </div>
+          {publishMutation.isError && <p role="alert" className="mt-3 text-sm text-red-700">{publishMutation.error.response?.data?.error || 'Could not publish the quiz. Please try again.'}</p>}
         </Card>
       )}
     </AppShell>

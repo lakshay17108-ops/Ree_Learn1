@@ -15,8 +15,10 @@ export const Classrooms = () => {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ name: '', section: '' });
   const [copiedCode, setCopiedCode] = useState(null);
+  const [copyError, setCopyError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
-  const { data: classrooms, isLoading } = useQuery({
+  const { data: classrooms, isLoading, isError } = useQuery({
     queryKey: ['classrooms'],
     queryFn: async () => {
       const { data } = await api.get('/classrooms');
@@ -31,6 +33,7 @@ export const Classrooms = () => {
       queryClient.invalidateQueries(['teacher-stats']);
       setShowModal(false);
       setForm({ name: '', section: '' });
+      setSuccessMessage('Classroom created successfully.');
     }
   });
 
@@ -39,13 +42,20 @@ export const Classrooms = () => {
     onSuccess: () => {
       queryClient.invalidateQueries(['classrooms']);
       queryClient.invalidateQueries(['teacher-stats']);
+      setSuccessMessage('Classroom deleted successfully.');
     }
   });
 
-  const copyCode = (code) => {
-    navigator.clipboard.writeText(code);
-    setCopiedCode(code);
-    setTimeout(() => setCopiedCode(null), 2000);
+  const copyCode = async (code) => {
+    setCopyError('');
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      setSuccessMessage('Join code copied.');
+      setTimeout(() => setCopiedCode(null), 2000);
+    } catch {
+      setCopyError('Could not copy the join code. Please select and copy it manually.');
+    }
   };
 
   if (isLoading) return (
@@ -56,6 +66,9 @@ export const Classrooms = () => {
 
   return (
     <AppShell title="Classrooms">
+      {isError && <p role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">Could not load classrooms. Please refresh and try again.</p>}
+      {copyError && <p role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{copyError}</p>}
+      {successMessage && <p role="status" className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{successMessage}</p>}
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -94,6 +107,7 @@ export const Classrooms = () => {
                     <p className="text-sm text-slate-400">Section {c.section}</p>
                   </div>
                 </div>
+                {deleteMutation.isError && deleteMutation.variables === c.id && <p role="alert" className="mb-2 text-xs text-red-700">{deleteMutation.error.response?.data?.error || 'Could not delete this classroom.'}</p>}
                 <button
                   onClick={() => {
                     if (window.confirm(`Delete "${c.name} — ${c.section}"? This cannot be undone.`)) {
@@ -140,7 +154,6 @@ export const Classrooms = () => {
             <input
               type="text"
               className={inputCls}
-              placeholder="e.g. Grade 10"
               value={form.name}
               onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
             />
@@ -150,12 +163,12 @@ export const Classrooms = () => {
             <input
               type="text"
               className={inputCls}
-              placeholder="e.g. A"
               value={form.section}
               onChange={e => setForm(f => ({ ...f, section: e.target.value }))}
             />
           </div>
           <p className="text-xs text-slate-400">A unique 6-character join code will be generated automatically.</p>
+          {createMutation.isError && <p role="alert" className="text-sm text-red-700">{createMutation.error.response?.data?.error || 'Could not create the classroom. Please try again.'}</p>}
         </div>
         <div className="flex justify-end gap-3 mt-6">
           <Button variant="secondary" onClick={() => setShowModal(false)}>Cancel</Button>

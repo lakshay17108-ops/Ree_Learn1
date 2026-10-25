@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Bookmark, Check, Clapperboard, FileText, Flag, Heart, Image, MessageSquareText,
@@ -12,29 +12,29 @@ import { Button, EmptyState, Modal, Spinner } from '../components/ui';
 const inputClass = 'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-teal-700 focus:ring-2 focus:ring-teal-700/15';
 const actionClass = 'inline-flex items-center gap-1.5 rounded-md px-2.5 py-2 text-xs font-medium transition-colors';
 
-const errorMessage = (error) => error?.response?.data?.error || error?.message || 'Something went wrong. Please try again.';
+const errorMessage = (error) => error?.response?.data?.error || 'Something went wrong. Please try again.';
+
+const compressImage = async (file) => {
+  if (!file.type.startsWith('image/')) return file;
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 1920 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', 0.82));
+  if (!blob) throw new Error('This image could not be compressed. Try a different image.');
+  if (blob.size >= file.size) return file;
+  const baseName = file.name.replace(/\.[^.]+$/, '');
+  const extension = blob.type === 'image/webp' ? 'webp' : blob.type === 'image/png' ? 'png' : 'jpg';
+  return new File([blob], `${baseName}.${extension}`, { type: blob.type, lastModified: file.lastModified });
+};
 
 const RevisionMedia = ({ post }) => {
-  const [source, setSource] = useState('');
-
-  useEffect(() => {
-    let active = true;
-    let objectUrl;
-    api.get(post.mediaUrl, { responseType: 'blob' }).then(({ data }) => {
-      objectUrl = URL.createObjectURL(data);
-      if (active) setSource(objectUrl);
-      else URL.revokeObjectURL(objectUrl);
-    }).catch(() => { if (active) setSource(''); });
-    return () => {
-      active = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [post.mediaUrl]);
-
-  if (!source) return <div className="mx-auto flex aspect-video max-h-[560px] items-center justify-center text-sm text-white/70">Loading media...</div>;
   return post.mediaType === 'IMAGE'
-    ? <img src={source} alt={post.title} className="mx-auto max-h-[560px] w-full object-contain" />
-    : <video src={source} controls playsInline className="mx-auto max-h-[560px] w-full" />;
+    ? <img src={post.mediaUrl} alt={post.title} className="mx-auto max-h-[560px] w-full object-contain" />
+    : <video src={post.mediaUrl} controls playsInline className="mx-auto max-h-[560px] w-full" />;
 };
 
 export const RevisionFeed = () => {
@@ -49,6 +49,7 @@ export const RevisionFeed = () => {
   const [media, setMedia] = useState(null);
   const [reviewDrafts, setReviewDrafts] = useState({});
   const [formError, setFormError] = useState('');
+  const [statusMessage, setStatusMessage] = useState('');
 
   const { data: subjects = [], isLoading: loadingSubjects } = useQuery({
     queryKey: ['revision-subjects'],
@@ -85,6 +86,7 @@ export const RevisionFeed = () => {
         if (media.size > 75 * 1024 * 1024) {
           throw new Error('Media must be 75 MB or smaller.');
         }
+
         const { data: upload } = await api.post('/revision/upload-signature', { subjectId: draft.subjectId });
         const body = new FormData();
         body.append('file', media);
@@ -108,11 +110,9 @@ export const RevisionFeed = () => {
           || uploadedType !== (media.type.startsWith('image/') ? 'IMAGE' : 'VIDEO')) {
           throw new Error(result.error?.message || 'Could not upload media to Cloudinary.');
         }
-        uploadedMedia = {
-          mediaUrl: result.secure_url,
-          mediaType: uploadedType
-        };
+        uploadedMedia = { mediaUrl: result.secure_url, mediaType: uploadedType };
       }
+
       return api.post('/revision/posts', { ...draft, ...uploadedMedia });
     },
     onSuccess: () => {
@@ -121,6 +121,7 @@ export const RevisionFeed = () => {
       setDraft({ subjectId: '', title: '', content: '' });
       setMedia(null);
       setFormError('');
+      setStatusMessage('Revision post published successfully.');
     },
     onError: error => setFormError(errorMessage(error))
   });
@@ -164,11 +165,12 @@ export const RevisionFeed = () => {
             <Plus className="mr-1.5 h-4 w-4" /> Share a revision post
           </Button>}
         </header>
+        {statusMessage && <p role="status" className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{statusMessage}</p>}
 
         <div className="mb-6 grid gap-3 rounded-md border border-slate-200 bg-white p-3 md:grid-cols-[minmax(150px,0.8fr)_minmax(180px,1fr)_minmax(180px,1fr)]">
           <label className="relative block">
             <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <input aria-label="Search revision posts" className={`${inputClass} pl-9`} placeholder="Search posts" value={search} onChange={event => setSearch(event.target.value)} />
+            <input aria-label="Search revision posts" className={`${inputClass} pl-9`} value={search} onChange={event => setSearch(event.target.value)} />
           </label>
           <select aria-label="Filter by classroom" className={inputClass} value={classroomId} onChange={event => { setClassroomId(event.target.value); setSubjectId(''); }}>
             <option value="">All classrooms</option>
@@ -238,7 +240,7 @@ export const RevisionFeed = () => {
                   <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-800"><MessageSquareText className="h-4 w-4 text-teal-800" /> Leave private feedback</div>
                   <p className="mb-3 text-xs text-slate-500">Only your teacher can see this. Your name is never shown.</p>
                   <div className="flex flex-col gap-2 sm:flex-row">
-                    <textarea className={`${inputClass} min-h-20 flex-1 resize-y`} maxLength={1000} placeholder="What could make this resource clearer or more useful?" value={reviewDrafts[post.id] ?? post.review?.message ?? ''} onChange={event => setReviewDrafts(current => ({ ...current, [post.id]: event.target.value }))} />
+                    <textarea aria-label="Private feedback" className={`${inputClass} min-h-20 flex-1 resize-y`} maxLength={1000} value={reviewDrafts[post.id] ?? post.review?.message ?? ''} onChange={event => setReviewDrafts(current => ({ ...current, [post.id]: event.target.value }))} />
                     <Button className="self-end sm:self-start" disabled={!(reviewDrafts[post.id] ?? post.review?.message ?? '').trim()} loading={reviewMutation.isPending && reviewMutation.variables?.postId === post.id} onClick={() => reviewMutation.mutate({ postId: post.id, message: (reviewDrafts[post.id] ?? post.review?.message ?? '').trim() })}>
                       <Send className="mr-1.5 h-4 w-4" /> {post.review ? 'Update feedback' : 'Send feedback'}
                     </Button>
@@ -270,26 +272,30 @@ export const RevisionFeed = () => {
             </select>
           </label>
           <label className="block text-sm font-medium text-slate-700">Title
-            <input className={`${inputClass} mt-1.5`} maxLength={120} placeholder="e.g. The water cycle in 60 seconds" value={draft.title} onChange={event => setDraft(current => ({ ...current, title: event.target.value }))} />
+            <input className={`${inputClass} mt-1.5`} maxLength={120} value={draft.title} onChange={event => setDraft(current => ({ ...current, title: event.target.value }))} />
           </label>
           <label className="block text-sm font-medium text-slate-700">Notes
-            <textarea className={`${inputClass} mt-1.5 min-h-32 resize-y`} maxLength={10000} placeholder="Write a short explanation, key steps, or a helpful reminder..." value={draft.content} onChange={event => setDraft(current => ({ ...current, content: event.target.value }))} />
+            <textarea className={`${inputClass} mt-1.5 min-h-32 resize-y`} maxLength={10000} value={draft.content} onChange={event => setDraft(current => ({ ...current, content: event.target.value }))} />
           </label>
           <label className="block text-sm font-medium text-slate-700">Photo or video <span className="font-normal text-slate-400">(optional, up to 75 MB)</span>
             <span className="mt-1.5 flex cursor-pointer items-center gap-3 rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-600 hover:border-teal-700">
               {media?.type.startsWith('video/') ? <Video className="h-5 w-5 text-teal-800" /> : <Image className="h-5 w-5 text-teal-800" />}
               <span className="min-w-0 flex-1 truncate">{media ? media.name : 'Choose an image or video'}</span>
               <Upload className="h-4 w-4 shrink-0 text-slate-400" />
-              <input className="sr-only" type="file" accept="image/*,video/*" onChange={event => {
-                const selectedMedia = event.target.files?.[0] || null;
-                if (selectedMedia?.size > 75 * 1024 * 1024) {
-                  setMedia(null);
-                  setFormError('Media must be 75 MB or smaller.');
-                  event.target.value = '';
+              <input className="sr-only" type="file" accept="image/*,video/*" onChange={async event => {
+                const file = event.target.files?.[0];
+                event.target.value = '';
+                if (!file) return;
+                setFormError('');
+                if (file.size > 75 * 1024 * 1024) {
+                  setFormError('Choose a file smaller than 75 MB.');
                   return;
                 }
-                setFormError('');
-                setMedia(selectedMedia);
+                try {
+                  setMedia(await compressImage(file));
+                } catch (error) {
+                  setFormError(error.message || 'Could not prepare this image for upload.');
+                }
               }} />
             </span>
           </label>

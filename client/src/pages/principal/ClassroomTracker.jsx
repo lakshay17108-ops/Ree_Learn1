@@ -58,7 +58,7 @@ const ClassroomDetail = ({ classroomId, onBack }) => {
               <p className="text-sm text-slate-500 mt-1">
                 Teacher: <span className="font-medium text-slate-700">{data.teacher.name}</span>
                 <span className="text-slate-400 mx-2">·</span>
-                {data.teacher.email}
+                <a href={`mailto:${data.teacher.email}`} className="hover:text-teal-700">{data.teacher.email}</a>
               </p>
               <p className="text-xs text-slate-400 mt-1">Created {new Date(data.createdAt).toLocaleDateString()}</p>
             </div>
@@ -140,7 +140,7 @@ const ClassroomDetail = ({ classroomId, onBack }) => {
                         </div>
                         <div>
                           <p className="font-medium text-slate-900">{s.name}</p>
-                          <p className="text-xs text-slate-500">{s.email}</p>
+                          <a href={`mailto:${s.email}`} className="text-xs text-slate-500 hover:text-teal-700">{s.email}</a>
                         </div>
                       </div>
                     </td>
@@ -215,7 +215,6 @@ export const ClassroomTracker = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Search classroom or teacher…"
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-600 bg-white"
